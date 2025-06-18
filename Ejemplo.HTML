@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Gimnasio IoT - Firebase</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #eef2f7; 
+            color: #333; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; 
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 900px; 
+            width: 100%;
+            background-color: #fff; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); 
+            box-sizing: border-box;
+        }
+        h1, h2 { 
+            color: #2c3e50; 
+            text-align: center; 
+            margin-bottom: 25px;
+        }
+        .data-card { 
+            border: 1px solid #dcdcdc; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            background-color: #f9f9f9; 
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .data-card p { 
+            margin: 8px 0; 
+            font-size: 1.1em; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+        }
+        .data-card strong { 
+            color: #555; 
+            min-width: 120px; 
+            text-align: left;
+        }
+        .data-value { 
+            font-weight: bold; 
+            color: #007bff; 
+            flex-grow: 1; 
+            text-align: right;
+        }
+        .status-ok { color: #28a745; } /* Verde para estados "OK" */
+        .status-alert { color: #dc3545; } /* Rojo para estados de "alerta" o "apagado" */
+        .status-info { color: #ffc107; } /* Amarillo para "cargando" */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏋️‍♀️ Monitoreo del Gimnasio IoT con Firebase</h1>
+        <p style="text-align: center; color: #666; font-style: italic;">
+            Esta página muestra los datos en tiempo real enviados por el ESP32 a tu Firebase Realtime Database.
+        </p>
+
+        <div class="data-card">
+            <h2>🟢 Estado de Conexión del ESP32</h2>
+            <p><strong>Última conexión:</strong> <span id="lastConnection" class="data-value status-info">Cargando...</span></p>
+        </div>
+
+        <div class="data-card">
+            <h2>🌡️💡 Zona 1</h2>
+            <p><strong>Temperatura:</strong> <span id="temp1" class="data-value status-info">Cargando...</span> °C</p>
+            <p><strong>Humedad:</strong> <span id="hum1" class="data-value status-info">Cargando...</span> %</p>
+            <p><strong>Luz (LDR):</strong> <span id="luz1" class="data-value status-info">Cargando...</span></p>
+        </div>
+
+        <div class="data-card">
+            <h2>🚽🚶‍♂️ Baño</h2>
+            <p><strong>Movimiento:</strong> <span id="movimientoBano" class="data-value status-info">Cargando...</span></p>
+            <p><strong>Luz Baño:</strong> <span id="luzBanoActuador" class="data-value status-info">Cargando...</span></p>
+        </div>
+        
+        <div class="data-card">
+            <h2>✨ Actuadores Generales</h2>
+            <p><strong>Clima:</strong> <span id="climaActuador" class="data-value status-info">Cargando...</span></p>
+            <p><strong>Focos Generales:</strong> <span id="focosActuador" class="data-value status-info">Cargando...</span></p>
+        </div>
+
+        <p style="text-align: center; color: #999; font-size: 0.9em; margin-top: 30px;">
+            <a href="https://console.firebase.google.com/project/gimnasio-setup/database/gimnasio-setup-default-rtdb/data" target="_blank" style="color: #007bff; text-decoration: none;">Ver datos en Firebase Console</a>
+        </p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script>
+        // ******************************************************************************
+        // * CONFIGURACIÓN DE TU PROYECTO FIREBASE                      *
+        // ******************************************************************************
+        // Estos valores son CRUCIALES y deben coincidir con los de tu ESP32 y tu proyecto Firebase.
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4Tch4HHiDPkvBoyOq-xArXoEnZek4Bm0", // Tu API Key (del ESP32)
+            databaseURL: "https://gimnasio-setup-default-rtdb.firebaseio.com/", // Tu Database URL (del ESP32)
+            projectId: "gimnasio-setup" // El ID de tu proyecto Firebase (lo encuentras en la URL de tu consola)
+        };
+
+        // Inicializa Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database(); // Referencia a la base de datos
+
+        // ******************************************************************************
+        // * LECTURA DE DATOS EN TIEMPO REAL (onValue)                  *
+        // ******************************************************************************
+        // Usamos .ref('ruta/en/firebase') para apuntar al nodo y .on('value', ...) para escuchar cambios.
+
+        // 1. Datos de Conexión del ESP32 (/Conexion/mensaje)
+        const lastConnectionRef = database.ref('Conexion/mensaje');
+        lastConnectionRef.on('value', (snapshot) => {
+            const data = snapshot.val(); // Obtiene el valor del nodo
+            const element = document.getElementById('lastConnection');
+            if (data) {
+                element.textContent = data;
+                element.classList.remove('status-info');
+                element.classList.add('status-ok');
+            } else {
+                element.textContent = 'No disponible';
+                element.classList.remove('status-ok');
+                element.classList.add('status-info');
+            }
+        });
+
+        // 2. Datos de Zona 1 (/gimnasio/zona1)
+        const zona1Ref = database.ref('gimnasio/zona1');
+        zona1Ref.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById('temp1').textContent = data.temperatura !== undefined ? data.temperatura : 'N/A';
+                document.getElementById('hum1').textContent = data.humedad !== undefined ? data.humedad : 'N/A';
+                document.getElementById('luz1').textContent = data.luz !== undefined ? data.luz : 'N/A';
+            } else {
+                document.getElementById('temp1').textContent = 'Esperando datos...';
+                document.getElementById('hum1').textContent = 'Esperando datos...';
+                document.getElementById('luz1').textContent = 'Esperando datos...';
+            }
+        });
+
+        // 3. Datos del Baño (/gimnasio/bano)
+        const banoRef = database.ref('gimnasio/bano');
+        banoRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            const movimientoElement = document.getElementById('movimientoBano');
+            const luzBanoElement = document.getElementById('luzBanoActuador');
+
+            if (data) {
+                // Movimiento
+                if (data.movimiento !== undefined) {
+                    movimientoElement.textContent = data.movimiento ? 'Detectado ✅' : 'No detectado ❌';
+                    movimientoElement.classList.remove('status-info', data.movimiento ? 'status-alert' : 'status-ok');
+                    movimientoElement.classList.add(data.movimiento ? 'status-ok' : 'status-alert');
+                } else {
+                    movimientoElement.textContent = 'N/A';
+                    movimientoElement.classList.add('status-info');
+                }
+
+                // Luz Baño (del nodo actuadores, no del baño directamente, para reflejar el estado del relé)
+                // Se actualizará con el listener de actuadores, pero lo dejamos aquí para claridad si solo se mirara este nodo.
+                // Sin embargo, es mejor que luzBanoActuador se actualice desde el listener de actuadores.
+                // Para este ejemplo, estamos leyendo 'gimnasio/bano' que solo tiene 'movimiento'.
+                // Si la luz del baño se maneja por el ESP32 basándose en el movimiento y escribe su estado en /gimnasio/actuadores/luz_bano,
+                // entonces la luz del baño debe ser monitoreada desde el listener de /gimnasio/actuadores.
+                // Esta línea de abajo es sólo un recordatorio. La lógica principal de luzBanoActuador está más abajo.
+            } else {
+                movimientoElement.textContent = 'Esperando datos...';
+                movimientoElement.classList.add('status-info');
+            }
+        });
+
+        // 4. Datos de Actuadores (/gimnasio/actuadores)
+        const actuadoresRef = database.ref('gimnasio/actuadores');
+        actuadoresRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                // Luz Baño
+                const luzBanoElement = document.getElementById('luzBanoActuador');
+                if (data.luz_bano !== undefined) {
+                    luzBanoElement.textContent = data.luz_bano ? 'Encendida ✅' : 'Apagada ❌';
+                    luzBanoElement.classList.remove('status-info', data.luz_bano ? 'status-alert' : 'status-ok');
+                    luzBanoElement.classList.add(data.luz_bano ? 'status-ok' : 'status-alert');
+                } else {
+                    luzBanoElement.textContent = 'N/A';
+                    luzBanoElement.classList.add('status-info');
+                }
+
+                // Clima
+                const climaElement = document.getElementById('climaActuador');
+                if (data.clima !== undefined) {
+                    climaElement.textContent = data.clima ? 'Encendido ✅' : 'Apagado ❌';
+                    climaElement.classList.remove('status-info', data.clima ? 'status-alert' : 'status-ok');
+                    climaElement.classList.add(data.clima ? 'status-ok' : 'status-alert');
+                } else {
+                    climaElement.textContent = 'N/A';
+                    climaElement.classList.add('status-info');
+                }
+
+                // Focos Generales
+                const focosElement = document.getElementById('focosActuador');
+                if (data.focos_generales !== undefined) {
+                    focosElement.textContent = data.focos_generales ? 'Encendidos ✅' : 'Apagados ❌';
+                    focosElement.classList.remove('status-info', data.focos_generales ? 'status-alert' : 'status-ok');
+                    focosElement.classList.add(data.focos_generales ? 'status-ok' : 'status-alert');
+                } else {
+                    focosElement.textContent = 'N/A';
+                    focosElement.classList.add('status-info');
+                }
+
+            } else {
+                document.getElementById('luzBanoActuador').textContent = 'Esperando datos...';
+                document.getElementById('climaActuador').textContent = 'Esperando datos...';
+                document.getElementById('focosActuador').textContent = 'Esperando datos...';
+                document.getElementById('luzBanoActuador').classList.add('status-info');
+                document.getElementById('climaActuador').classList.add('status-info');
+                document.getElementById('focosActuador').classList.add('status-info');
+            }
+        });
+
+        // NOTA: Para las Zonas 2 y 3 (solo monitoreo), puedes añadir secciones HTML y JavaScript similares
+        // si tus compañeros las necesitan visualizar en el frontend. El patrón es el mismo:
+        // 1. Añadir elementos <p> con <span> y un ID en el HTML.
+        // 2. Añadir un nuevo 'database.ref()' y '.on('value', ...)' en JavaScript para esa ruta.
+    </script>
+</body>
+</html>
