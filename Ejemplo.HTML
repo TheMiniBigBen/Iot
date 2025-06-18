@@ -81,6 +81,18 @@
         </div>
 
         <div class="data-card">
+            <h2>🌡️💡 Zona 2</h2>
+            <p><strong>Temperatura:</strong> <span id="temp2" class="data-value status-info">Cargando...</span> °C</p>
+            <p><strong>Humedad:</strong> <span id="hum2" class="data-value status-info">Cargando...</span> %</p>
+            <p><strong>Luz (LDR):</strong> <span id="luz2" class="data-value status-info">Cargando...</span></p>
+        </div>
+        <div class="data-card">
+            <h2>🌡️💡 Zona 3 (Solo Monitoreo)</h2>
+            <p><strong>Temperatura:</strong> <span id="temp3" class="data-value status-info">Cargando...</span> °C</p>
+            <p><strong>Humedad:</strong> <span id="hum3" class="data-value status-info">Cargando...</span> %</p>
+            <p><strong>Luz (LDR):</strong> <span id="luz3" class="data-value status-info">Cargando...</span></p>
+        </div>
+        <div class="data-card">
             <h2>🚽🚶‍♂️ Baño</h2>
             <p><strong>Movimiento:</strong> <span id="movimientoBano" class="data-value status-info">Cargando...</span></p>
             <p><strong>Luz Baño:</strong> <span id="luzBanoActuador" class="data-value status-info">Cargando...</span></p>
@@ -103,26 +115,24 @@
         // ******************************************************************************
         // * CONFIGURACIÓN DE TU PROYECTO FIREBASE                      *
         // ******************************************************************************
-        // Estos valores son CRUCIALES y deben coincidir con los de tu ESP32 y tu proyecto Firebase.
         const firebaseConfig = {
-            apiKey: "AIzaSyA4Tch4HHiDPkvBoyOq-xArXoEnZek4Bm0", // Tu API Key (del ESP32)
-            databaseURL: "https://gimnasio-setup-default-rtdb.firebaseio.com/", // Tu Database URL (del ESP32)
-            projectId: "gimnasio-setup" // El ID de tu proyecto Firebase (lo encuentras en la URL de tu consola)
+            apiKey: "AIzaSyA4Tch4HHiDPkvBoyOq-xArXoEnZek4Bm0", 
+            databaseURL: "https://gimnasio-setup-default-rtdb.firebaseio.com/", 
+            projectId: "gimnasio-setup" 
         };
 
         // Inicializa Firebase
         firebase.initializeApp(firebaseConfig);
-        const database = firebase.database(); // Referencia a la base de datos
+        const database = firebase.database(); 
 
         // ******************************************************************************
         // * LECTURA DE DATOS EN TIEMPO REAL (onValue)                  *
         // ******************************************************************************
-        // Usamos .ref('ruta/en/firebase') para apuntar al nodo y .on('value', ...) para escuchar cambios.
 
         // 1. Datos de Conexión del ESP32 (/Conexion/mensaje)
         const lastConnectionRef = database.ref('Conexion/mensaje');
         lastConnectionRef.on('value', (snapshot) => {
-            const data = snapshot.val(); // Obtiene el valor del nodo
+            const data = snapshot.val(); 
             const element = document.getElementById('lastConnection');
             if (data) {
                 element.textContent = data;
@@ -150,13 +160,45 @@
             }
         });
 
+        // ***** INICIO NUEVO CÓDIGO JS: ZONA 2 *****
+        const zona2Ref = database.ref('gimnasio/zona2');
+        zona2Ref.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById('temp2').textContent = data.temperatura !== undefined ? data.temperatura : 'N/A';
+                document.getElementById('hum2').textContent = data.humedad !== undefined ? data.humedad : 'N/A';
+                document.getElementById('luz2').textContent = data.luz !== undefined ? data.luz : 'N/A';
+            } else {
+                document.getElementById('temp2').textContent = 'Esperando datos...';
+                document.getElementById('hum2').textContent = 'Esperando datos...';
+                document.getElementById('luz2').textContent = 'Esperando datos...';
+            }
+        });
+        // ***** FIN NUEVO CÓDIGO JS: ZONA 2 *****
+
+        // ***** INICIO NUEVO CÓDIGO JS: ZONA 3 *****
+        const zona3Ref = database.ref('gimnasio/zona3');
+        zona3Ref.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById('temp3').textContent = data.temperatura !== undefined ? data.temperatura : 'N/A';
+                document.getElementById('hum3').textContent = data.humedad !== undefined ? data.humedad : 'N/A';
+                document.getElementById('luz3').textContent = data.luz !== undefined ? data.luz : 'N/A';
+            } else {
+                document.getElementById('temp3').textContent = 'Esperando datos...';
+                document.getElementById('hum3').textContent = 'Esperando datos...';
+                document.getElementById('luz3').textContent = 'Esperando datos...';
+            }
+        });
+        // ***** FIN NUEVO CÓDIGO JS: ZONA 3 *****
+
+
         // 3. Datos del Baño (/gimnasio/bano)
         const banoRef = database.ref('gimnasio/bano');
         banoRef.on('value', (snapshot) => {
             const data = snapshot.val();
             const movimientoElement = document.getElementById('movimientoBano');
-            const luzBanoElement = document.getElementById('luzBanoActuador');
-
+            
             if (data) {
                 // Movimiento
                 if (data.movimiento !== undefined) {
@@ -167,14 +209,6 @@
                     movimientoElement.textContent = 'N/A';
                     movimientoElement.classList.add('status-info');
                 }
-
-                // Luz Baño (del nodo actuadores, no del baño directamente, para reflejar el estado del relé)
-                // Se actualizará con el listener de actuadores, pero lo dejamos aquí para claridad si solo se mirara este nodo.
-                // Sin embargo, es mejor que luzBanoActuador se actualice desde el listener de actuadores.
-                // Para este ejemplo, estamos leyendo 'gimnasio/bano' que solo tiene 'movimiento'.
-                // Si la luz del baño se maneja por el ESP32 basándose en el movimiento y escribe su estado en /gimnasio/actuadores/luz_bano,
-                // entonces la luz del baño debe ser monitoreada desde el listener de /gimnasio/actuadores.
-                // Esta línea de abajo es sólo un recordatorio. La lógica principal de luzBanoActuador está más abajo.
             } else {
                 movimientoElement.textContent = 'Esperando datos...';
                 movimientoElement.classList.add('status-info');
@@ -228,11 +262,6 @@
                 document.getElementById('focosActuador').classList.add('status-info');
             }
         });
-
-        // NOTA: Para las Zonas 2 y 3 (solo monitoreo), puedes añadir secciones HTML y JavaScript similares
-        // si tus compañeros las necesitan visualizar en el frontend. El patrón es el mismo:
-        // 1. Añadir elementos <p> con <span> y un ID en el HTML.
-        // 2. Añadir un nuevo 'database.ref()' y '.on('value', ...)' en JavaScript para esa ruta.
     </script>
 </body>
 </html>
